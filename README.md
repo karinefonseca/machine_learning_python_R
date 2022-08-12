@@ -13,4 +13,8 @@ Maiores informações então nos respectivos diretórios.
   
   ## Reconhecimento de Fala (Speech Recognition)
   
-  Neste projeto faço o reconhecimento de fala 
+  Neste pequeno projeto, desenvolvido no curso de Natural Language Processing: Machine Learning NLP In Python, utilizo a Google Speech Recognition API para fazer o reconhecimento e posterior transcrição (Speech-to-Text) de um áudio enviado. 
+  
+  ## Modelo de Classificação (8ª Competição de Machine Learning - Flai)
+  
+  Neste projeto foi elaborado um modelo de classificação, onde obtive o 5º lugar da minha turma e 22º lugar geral. 
