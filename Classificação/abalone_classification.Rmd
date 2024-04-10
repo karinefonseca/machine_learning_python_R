@@ -1,0 +1,209 @@
+---
+title: "Abalone_Classification"
+output: pdf_document
+date: "2023-04-24"
+---
+
+Neste trabalho analiso os dados de https://archive.ics.uci.edu/ml/datasets/abalone.
+
+O abalone é um molusco gastrópode pertencente à família Haliotidae e é encontrado sob a forma de diversas espécies em águas costeiras de quase todo o mundo. Por causa de seu uso como jóia e alimento,há duas espécies de abalone que se encontram em risco de extinção.
+
+Neste projeto, irei prever a idade do abalone baseada em fatores físicos.
+
+A idade do abalone é determinada cortando a casca através do cone, manchando-a e contando o número de anéis através de um microscópio. Outras medidas, mais fáceis de obter, são usadas para prever a idade.
+
+| Nome                           	  | Tipo de Dado      | Unidade de Medida      | Descrição                        |
+|---------------------------------- |------------------	|----------------------- |---------------------------------	|
+| Sex (Sexo)                        | nominal           |   --                   | M, F e I (infantil)              |
+| Length (Comprimento)       	      | contínuo          | mm                     | Medição mais longa da concha     |
+| Diameter (Diâmetro)      	        | contínuo          | mm                     | Perpendicular ao comprimento     | 
+| Height (Altura)       	          | contínuo          | mm                     | Com carne na concha              |
+| Whole weight (Peso total)      	  | contínuo          | gramas                 | Abalone inteiro                  |
+| Shucked weight (Peso da carne)    | contínuo          | gramas                 | Peso da carne                    |
+| Viscera weight (Peso das vísceras)| contínuo          | gramas                 | Peso do intestino (após sangria) |
+| Shell weight (Peso da concha)     | contínuo          | gramas                 | Depois de seco                   |
+| Rings (Anéis)          	          | inteiro           |   --                   | +1,5 dá a idade em anos          |
+
+
+**Bibliotecas**
+
+``` {r include=TRUE} 
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("GGally")
+#install.packages("ggcorrplot")
+#install.packages("DataExplorer")
+#install.packages("caret")
+#install.packages("doParallel")
+#install.packages("caret")
+#install.packages("rpart.plot")
+#install.packages("rpart")
+#install.packages("VIM")
+#install.packages("rattle")
+#install.packages("RColorBrewer")
+```
+
+**Chamada das Bibliotecas**
+``` {r include=TRUE}    
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(ggcorrplot)
+library(readr)
+library(DataExplorer)
+library(doParallel)
+library(caret)
+library(rpart)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+library(VIM)
+```
+
+**Paralelização**
+
+``` {r}    
+c1 <- makePSOCKcluster(8)
+registerDoParallel(c1)
+#stopCluster(c1)
+#registerDoSEQ()
+#remove(c1)
+```
+
+
+**Visualização Geral do DataFrame**
+
+``` {r}
+options(scipen = 999) #visualização dos dados sem a notação científica
+
+abalone <- read_csv("abalone.csv", show_col_types = FALSE)
+abalone <- as_tibble(abalone)
+abalone
+```
+
+**O dataset possui 9 atributos e 4177 instâncias**
+
+``` {r}
+#Atributos
+ncol(abalone)
+
+#Instâncias
+nrow(abalone) 
+
+```
+
+**Dos 9 atributos, 8 são do tipo num e 1 do tipo chr.**
+
+```{r}
+str(abalone) 
+```
+**Aqui estão presentes o máximo, mínimo, média e mediana dos atributos númericos.***
+
+```{r}
+summary(abalone)
+```
+
+**Verificação de dados Missing**
+
+```{r}
+ppData <- abalone
+missPlotData <- aggr(ppData, numbers = TRUE, sortvars = TRUE, labels = names(ppData), cex.axis = 0.4, gap = 2)
+```
+
+**Categorização da variável Rings em Old, Adult e Young**
+
+```{r}
+plot_density(abalone$Rings)
+```
+
+```{r}
+abalone_class <- abalone %>%
+  mutate(Age=case_when(
+    Rings %in% 1:5 ~ "young",
+    Rings %in% 6:13 ~ "adult",
+    Rings %in% 14:30 ~ "old"
+  ))
+
+#converte AGE em factor
+abalone_class$Age <- as.factor(abalone_class$Age)
+str(abalone_class)
+```
+
+**Retirada da coluna Rings**
+```{r}
+myvars <- names(abalone_class) %in% c("Rings") 
+abalone_class <- abalone_class[!myvars]
+str(abalone_class)
+```
+
+**Separação entre treino e teste** 
+```{r}
+
+set.seed(123)
+partition <- createDataPartition(abalone_class$Age, p=0.75, list = FALSE)
+
+train.set <- abalone_class[partition,]
+test.set <- abalone_class[-partition,]
+
+#test.set
+
+```
+
+**Modelo e plot da Árvore**
+
+```{r}
+
+abalone_tree <- rpart(Age~., data=train.set, method = "class", control=rpart.control(minsplit=60, minbucket=30, maxdepth=10))
+
+fancyRpartPlot(abalone_tree, caption = NULL)
+
+```
+
+**Predições**
+
+```{r}
+
+predictions <- predict(abalone_tree,test.set)
+
+predictions
+
+``` 
+
+**Como a estrutura de predictions está dessa forma 
+
+adult        old      young
+1    0.8983051 0.08474576 0.01694915
+
+Eu fiz uma função para colocar em uma lista o nome da coluna com o maior valor. E após uso a função factor para que fique igual a test.set$Age o que me permite usar a confusionMatrix**
+
+```{r}
+maior_coluna <- function(dados) {
+  idx <- max.col(dados)
+  nomes <- colnames(dados)
+  resultado <- lapply(1:nrow(dados), function(i) nomes[idx[i]])
+  return(resultado)
+}
+
+predicao <- maior_coluna(data.frame(predictions))
+
+predicao_class <- factor(make.names(predicao))
+
+#str(predicao_class)
+#str(test.set$Age)
+
+``` 
+
+**Matriz de Confusão**
+
+```{r}
+
+cm <- confusionMatrix(predicao_class, test.set$Age, mode = "everything")
+cm
+
+#str(train.set$Age)
+#str(predicao_class)
+
+#cm <- confusionMatrix(predicao_class, train.set$Age, mode = "everything")
+#cm
+
+```

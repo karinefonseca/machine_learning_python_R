@@ -1,0 +1,242 @@
+---
+title: "Labor"
+output: pdf_document
+date: "2023-05-04"
+---
+
+Neste trabalho analiso os dados de http://archive.ics.uci.edu/ml/datasets/Labor+Relations?ref=datanews.io e o artigo mencionado para o projeto está em http://ebot.gmu.edu/handle/1920/1622.
+
+O projeto original, conforme a descrição do mesmo, teve como propósito "Software de aprendizagem de conceitos testando um método experimental para aprender descrições de conceitos em duas camadas. Os dados foram utilizados para aprender a descrição de um contrato aceitável e não aceitável. Os contratos não aceitáveis foram obtidos por meio de entrevistas com especialistas ou por meio de criação de exemplos similares, mas que não atendiam aos requisitos do contrato aceitável."
+
+As descrições dos atributos são:
+
+| Nome                           	| Tipo                                    	| Descrição                                                              	|
+|--------------------------------	|-----------------------------------------	|------------------------------------------------------------------------	|
+| duration                       	| numeric                                 	| duração do acordo                                                      	|
+| wage-increase-first-year       	| numeric                                 	| aumento salarial no primeiro ano do contrato                           	|
+| wage-increase-second-year      	| numeric                                 	| aumento salarial no segundo ano do contrato                            	|
+| wage-increase-third-year       	| numeric                                 	| aumento salarial no terceiro ano do contrato                           	|
+| cost-of-living-adjustment      	| {'none','tcf','tc'}                     	| ajuda de custo de vida                                                 	|
+| working-hours                  	| numeric                                 	| número de horas de trabalho durante a semana                           	|
+| pension                        	| {'none','ret_allw', 'empl_contr'}       	| contribuições do empregador para o plano de pensão                     	|
+| standby-pay                    	| numeric                                 	| pagamento de disponibilidade                                           	|
+| shift-differential             	| numeric                                 	| diferencial de turno: suplemento para trabalho no II e III turno       	|
+| education-allowance            	| {'yes','no'}                            	| ajuda de custo para educação                                           	|
+| statutory-holidays             	| numeric                                 	| número de feriados legais                                              	|
+| vacation                       	| {'below_average','average', 'generous'} 	| número de dias de férias remuneradas                                   	|
+| longterm-disability-assistance 	| {'yes','no'}                            	| ajuda do empregador durante a incapacidade de longo prazo do empregado 	|
+| contribution-to-dental-plan    	| {'none','half','full'}                  	| contribuição do empregador para o plano odontológico                   	|
+| bereavement-assistance         	| {'yes','no'}                            	| contribuição financeira do empregador para cobrir os custos de luto    	|
+| contribution-to-health-plan    	| {'none','half','full'}                  	| contribuição do empregador para o plano de saúde                       	|
+| class                          	| {'bad','good'}                          	|                                                                        	|
+
+
+**Limpando o ambiente de execução**
+
+```{r}
+rm(list = ls())
+```
+
+
+**Setando o Local de trabalho**
+
+```{r}
+setwd("C:/Users/karin/OneDrive/Desktop/Mestrado/Mineração")
+```
+
+**Bibliotecas**
+
+```{r include=TRUE} 
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("GGally")
+#install.packages("ggcorrplot")
+#install.packages("DataExplorer")
+#install.packages("caret")
+#install.packages("rpart.plot")
+#install.packages("rpart")
+#install.packages("VIM")
+#install.packages("rattle")
+#install.packages("sampling")
+#install.packages("arules")
+#install.packages("foreign")
+#install.packages("zoo")
+#install.packages("Hmisc")
+#install.packages("corrplot")
+```
+**Chamada das Bibliotecas**
+
+```{r}    
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(ggcorrplot)
+library(readr)
+library(DataExplorer)
+library(doParallel)
+library(caret)
+library(rpart)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+library(VIM)
+library(sampling)
+library(arules)
+library(foreign)
+library(zoo)
+library(Hmisc)
+library(corrplot)
+```
+
+**Importação e Visualização Geral do DataFrame**
+
+``` {r}
+options(scipen = 999) #visualização dos dados sem a notação científica
+
+labor <- read.arff("C:/Users/karin/OneDrive/Desktop/Mestrado/Mineração/labor.arff")
+summary(labor)
+
+```
+
+**Número de instâncias e atributos**
+
+``` {r}
+#Atributos
+ncol(labor)
+
+#Instâncias
+nrow(labor) 
+
+```
+
+**Tipos dos atributos: 8 são númericos e 9 categóricos.**
+
+```{r}
+str(labor) 
+```
+
+**Verificação de dados Missing**
+
+```{r}
+ppData <- labor
+missPlotData <- aggr(ppData, numbers = TRUE, sortvars = TRUE, labels = names(ppData), cex.axis = 0.4, gap = 2)
+```
+```{r}
+plot_missing(labor) 
+```
+
+**Retirada das colunas com missing acima de 30%**
+
+**Foram retiradas essas colunas tendo em vista que ao fazer a imputação geraria um desbalanceamento das classes comprometendo a confiabilidade do modelo**
+```{r}
+myvars <- names(labor) %in% c("shift-differential","bereavement-assistance","longterm-disability-assistance", "pension", "education-allowance", "wage-increase-third-year", "standby-pay", "contribution-to-dental-plan", "contribution-to-health-plan","cost-of-living-adjustment") 
+labor <- labor[!myvars]
+#str(labor)
+summary(labor)
+```
+
+**Imputação nos campos Missing**
+```{r}
+labor$duration <- impute(labor$duration, median)
+labor$`wage-increase-first-year` <- impute(labor$`wage-increase-first-year`, median)
+labor$`wage-increase-second-year`<- impute(labor$`wage-increase-second-year`, median)
+labor$`working-hours`<- impute(labor$`working-hours`,median)
+labor$`statutory-holidays`<- impute(labor$`statutory-holidays`,median)
+labor$vacation <- impute(labor$vacation, mode)
+
+summary(labor)
+```
+
+**Correlação**
+**Criei uma nova base de dados sem as colunas com dados categóricos para plotar a matriz de correlação** 
+
+```{r}
+myvars <- names(labor) %in% c("vacation","class") 
+labor_corr <- labor[!myvars]
+
+corrplot(cor(labor_corr), method = "circle")
+
+```
+
+**Análise Geral dos Dados**
+```{r}
+ggpairs(labor, columns = 1:7, ggplot2::aes(colour=class))
+```
+
+**Relação entre o tempo de férias e a classe**
+
+```{r}
+count_data = labor %>% group_by(vacation, class) %>% count()
+ggplot(count_data, aes(x = vacation, y = n, color = class, fill = class)) + 
+    geom_bar(position = "fill",stat = "identity")
+```
+
+**Separação entre treino e teste** 
+```{r}
+
+set.seed(123)
+partition <- createDataPartition(labor$class, p=0.75, list = FALSE)
+
+train.set <- labor[partition,]
+test.set <- labor[-partition,]
+
+test.set
+
+```
+
+**Modelo e plot da Árvore**
+
+```{r}
+
+labor_tree <- rpart(class~., data=train.set, method = "class", control=rpart.control(minsplit=20, minbucket=20, maxdepth=10))
+
+fancyRpartPlot(labor_tree, caption = NULL)
+
+```
+
+**Predições**
+```{r}
+
+predictions <- predict(labor_tree,test.set)
+
+predictions
+
+``` 
+
+**Como a estrutura de predictions está dessa forma**
+
+|bad                             	| good                                    
+|--------------------------------	|-----------------------------------------	|
+| 0.550000                       	| 0.450000                                 	|  
+
+      
+**Eu fiz uma função para colocar em uma lista o nome da coluna com o maior valor. E após uso a função factor para que fique igual a test.set$Age o que me permite usar a confusionMatrix**
+
+```{r}
+maior_coluna <- function(dados) {
+  idx <- max.col(dados)
+  nomes <- colnames(dados)
+  resultado <- lapply(1:nrow(dados), function(i) nomes[idx[i]])
+  return(resultado)
+}
+
+predicao <- maior_coluna(data.frame(predictions))
+
+predicao_class <- factor(make.names(predicao))
+
+str(predicao_class)
+str(test.set$class)
+
+``` 
+
+**Matriz de Confusão**
+
+```{r}
+
+cm <- confusionMatrix(predicao_class, test.set$class, mode = "everything")
+cm
+
+str(train.set$class)
+str(predicao_class)
+
+```
