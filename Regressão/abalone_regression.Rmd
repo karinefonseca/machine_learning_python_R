@@ -1,0 +1,213 @@
+---
+title: "Abalone_Regression"
+output: pdf_document
+date: "2023-04-24"
+---
+
+Neste trabalho analiso os dados de https://archive.ics.uci.edu/ml/datasets/abalone.
+
+O abalone é um molusco gastrópode pertencente à família Haliotidae e é encontrado sob a forma de diversas espécies em águas costeiras de quase todo o mundo. Por causa de seu uso como jóia e alimento,há duas espécies de abalone que se encontram em risco de extinção.
+
+Neste projeto, irei prever a idade do abalone baseada em fatores físicos.
+
+A idade do abalone é determinada cortando a casca através do cone, manchando-a e contando o número de anéis através de um microscópio. Outras medidas, mais fáceis de obter, são usadas para prever a idade.
+
+| Nome                           	  | Tipo de Dado      | Unidade de Medida      | Descrição                        |
+|---------------------------------- |------------------	|----------------------- |---------------------------------	|
+| Sex (Sexo)                        | nominal           |   --                   | M, F e I (infantil)              |
+| Length (Comprimento)       	      | contínuo          | mm                     | Medição mais longa da concha     |
+| Diameter (Diâmetro)      	        | contínuo          | mm                     | Perpendicular ao comprimento     | 
+| Height (Altura)       	          | contínuo          | mm                     | Com carne na concha              |
+| Whole weight (Peso total)      	  | contínuo          | gramas                 | Abalone inteiro                  |
+| Shucked weight (Peso da carne)    | contínuo          | gramas                 | Peso da carne                    |
+| Viscera weight (Peso das vísceras)| contínuo          | gramas                 | Peso do intestino (após sangria) |
+| Shell weight (Peso da concha)     | contínuo          | gramas                 | Depois de seco                   |
+| Rings (Anéis)          	          | inteiro           |   --                   | +1,5 dá a idade em anos          |
+
+
+**Bibliotecas**
+
+``` {r include=TRUE} 
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("GGally")
+#install.packages("ggcorrplot")
+#install.packages("DataExplorer")
+#install.packages("caret")
+#install.packages("corrplot")
+#install.packages("doParallel")
+#install.packages("caret")
+#install.packages("rpart.plot")
+#install.packages("rpart")
+#install.packages("VIM")
+#install.packages("rattle")
+#install.packages("RColorBrewer")
+```
+
+**Chamada das Bibliotecas**
+``` {r include=TRUE}    
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(ggcorrplot)
+library(corrplot)
+library(readr)
+library(DataExplorer)
+library(doParallel)
+library(caret)
+library(rpart)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+library(VIM)
+library(ModelMetrics)
+```
+
+**Limpando o ambiente de execução**
+
+```{r}
+rm(list = ls())
+```
+
+**Setando o Local de trabalho**
+
+```{r}
+setwd("C:/Users/karin/OneDrive/Desktop/Mestrado/Mineração")
+```
+
+**Visualização Geral do DataFrame**
+
+``` {r}
+options(scipen = 999) #visualização dos dados sem a notação científica
+
+abalone <- read_csv("abalone.csv", show_col_types = FALSE)
+abalone <- as_tibble(abalone)
+abalone
+```
+
+**O dataset possui 9 atributos e 4177 instâncias**
+
+``` {r}
+#Atributos
+ncol(abalone)
+
+#Instâncias
+nrow(abalone) 
+```
+
+**Dos 9 atributos, 8 são do tipo num e 1 do tipo chr.**
+
+```{r}
+str(abalone) 
+```
+**Aqui estão presentes o máximo, mínimo, média e mediana dos atributos númericos.***
+
+```{r}
+summary(abalone)
+```
+
+**Verificação de dados Missing**
+
+```{r}
+ppData <- abalone
+missPlotData <- aggr(ppData, numbers = TRUE, sortvars = TRUE, labels = names(ppData), cex.axis = 0.4, gap = 2)
+```
+
+**Criação a coluna Age**
+```{r}
+abalone$Age <- abalone$Rings
+```
+
+
+**Cópia dos dados de Rings para Age e soma de 1.5 para ter a idade**
+```{r}
+abalone$Age <- as.numeric(abalone$Age) #convertendo de inteiro para float
+abalone$Age <- abalone$Age + 1.5
+abalone
+```
+
+**Retirada da coluna Rings**
+```{r}
+myvars <- names(abalone) %in% c("Rings") 
+abalone <- abalone[!myvars]
+str(abalone)
+```
+**Seleção de Características**
+
+**Verificação da correlação entre os atributos**
+
+```{r}
+numericCol <- unlist(lapply(abalone, is.numeric))
+numericData <- abalone[,numericCol]
+
+correlationMatrix <- cor(numericData)
+corrplot(correlationMatrix, method = "circle")
+``` 
+
+**Como são altamente relacionados, plotei novo gráfico para saber o ponto de corte para a seleção**
+
+```{r}
+ggcorr(abalone, label=T)
+```
+
+**Definido o ponto de corte, fiz a seleção**
+```{r}
+p <- 0.9
+
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff = p, names = TRUE)
+  
+myvars <- names(abalone) %in% c(highlyCorrelated) 
+abalone_regression <- abalone[!myvars]
+
+str(abalone_regression)
+```
+
+**Separação entre treino e teste** 
+```{r}
+set.seed(123)
+partition <- createDataPartition(abalone_regression$Age, p=0.75, list = FALSE)
+
+train.set <- abalone_regression[partition,]
+test.set <- abalone_regression[-partition,]
+
+#train.set
+```
+
+**Modelo de Regressão Linear**
+
+```{r}
+tc <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+
+regressao_linear <- train(Age ~. , data = train.set, method = "lm", trControl = tc)
+
+regressao_linear
+```
+
+**Predições - Regressão Linear**
+
+```{r}
+predictionsL <- predict(regressao_linear, test.set)
+
+RMSEL <- rmse(abalone_regression$Age,predictionsL)
+
+RMSEL
+``` 
+**Support Vector Machines com Núcleo Linear**
+
+```{r}
+train_control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+svm1 <- train(Age ~., data = train.set, method = "svmLinear", trControl = train_control,  preProcess = c("center","scale"))
+
+svm1
+```
+**Predições - Support Vector Machines com Núcleo Linear**
+
+```{r}
+predictionsSVM <- predict(svm1, test.set)
+
+RMSEL <- rmse(abalone_regression$Age,predictionsSVM)
+
+RMSEL
+``` 
+**Fiz duas execuções de maneiras diferentes utilizando modelo linear (SVM com kernel linear e a própria regressão linear). Como esperado, ambos obtiveram RMSE por volta de 2.5,o que significa um desvio padrão de 2.5 dos valores reais. Para o caso do abalone, onde os valores são baixos, considero um resultado mediano para ruim.**

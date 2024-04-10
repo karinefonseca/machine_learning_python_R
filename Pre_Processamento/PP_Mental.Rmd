@@ -1,0 +1,278 @@
+---
+title: "Pré processamento - Mental Health"
+output: pdf_document
+date: "2023-04-16"
+---
+
+Neste trabalho analiso os dados de https://www.kaggle.com/datasets/osmi/mental-health-in-tech-survey que se trata de uma base de dados oriunda de uma pesquisa sobre a saúde mental e frequência de doenças mentais na área tech.
+
+
+**Bibliotecas**
+
+``` {r include=TRUE} 
+
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("GGally")
+#install.packages("ggcorrplot")
+#install.packages("DataExplorer")
+#install.packages("sampling")
+#install.packages("arules")
+```
+
+**Chamada das Bibliotecas**
+
+``` {r include=TRUE}    
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(ggcorrplot)
+library(readr)
+library(DataExplorer)
+library(sampling)
+library(arules)
+library(dplyr)
+```
+
+**Visualização Geral do DataFrame**
+
+``` {r}
+options(scipen = 999) #visualização dos dados de idade sem a notação científica
+
+mental <- read_csv("survey.csv", show_col_types = FALSE)
+mental <- as_tibble(mental)
+mental
+```
+
+**O dataset possui 27 atributos e 1259 instâncias**
+
+``` {r}
+#Atributos
+ncol(mental)
+
+#Instâncias
+nrow(mental) 
+
+```
+
+**Dos 27 atributos, 26 são chr (character) e 1 do tipo num.**
+
+```{r}
+str(mental) 
+```
+**Aqui estão presentes o máximo, mínimo, média e mediana da coluna Age. Percebe-se que a mesma possui uma série de outliers que precisarão de tratamento.**
+
+```{r}
+summary(mental)
+```
+
+**Aqui temos outra forma de cálculo de mean (media) bem como o cálculo do desvio padrão. Como dito anteriormente a coluna Age possui outliers.**
+
+```{r}
+mental %>% pull(Age) %>% mean()
+mental %>% pull(Age) %>% sd()
+```
+**Atribuitos categóricos**
+
+```{r}
+#mental %>% count(Age)
+mental %>% count(Country)
+mental %>% count(Gender)
+mental %>% count(state)
+mental %>% count(self_employed)
+mental %>% count(treatment)
+mental %>% count(work_interfere)
+mental %>% count(no_employees)
+mental %>% count(remote_work)
+mental %>% count(tech_company)      
+mental %>% count(benefits)   
+mental %>% count(care_options)  
+mental %>% count(wellness_program)   
+mental %>% count(seek_help)        
+mental %>% count(anonymity)            
+mental %>% count(leave)
+mental %>% count(mental_health_consequence)
+mental %>% count(phys_health_consequence)
+mental %>% count(coworkers)
+mental %>% count(supervisor)
+mental %>% count(mental_health_interview)
+mental %>% count(phys_health_interview)
+mental %>% count(mental_vs_physical)
+mental %>% count(obs_consequence)
+mental %>% count(comments)
+                   
+```
+
+**Histograma do atributo Age**
+
+```{r}
+ggplot(mental, aes(Age)) + geom_histogram(bins = 5)
+```
+**Exclui os outliers utilizando o primeiro e terceiro quartis. E redefini o dataframe de mental para mental_sem_outliers. Através desta abordagem o dataset que possuía 1259 instâncias agora possui 1219 instâncias. Fazendo o percentual, a redução foi aproximadamente 3,2% o que não considero um impacto significativo. Assim mantenho a exclusão dos outliers.**
+
+```{r}
+Q1 <- quantile(mental$Age, .25)
+Q3 <- quantile(mental$Age, .75)
+IQR <- IQR(mental$Age)
+
+#mantém apenas as linhas do dataframe que tenham valores dentro de 1,5 * IQR de Q1 e Q3
+
+mental_sem_outliers <- subset(mental, mental$Age> (Q1 - 1.5*IQR) & mental$Age< (Q3 + 1.5*IQR))
+
+mental_sem_outliers
+```
+
+**Histograma sem os outliers**
+
+```{r}
+ggplot(mental_sem_outliers, aes(Age)) + geom_histogram(bins = 5)
+```
+**Valores Missing**
+
+**Fiz o gráfico para verificar a porcentagem de dados missing. A coluna comments tem 87,12% dos dados faltantes. Dessa forma, optei por excluir a coluna. A coluna state possui 41,35% dos dados faltantes. Ao observar a base, percebe-se que os dados existentes referem-se aos Estados dos Estados Unidos e que para os demais países isso não foi contabilizado. Dessa forma, também exclui a coluna state para fazer a análise voltada aos países**
+
+```{r}
+plot_missing(mental_sem_outliers) 
+```
+**Exclusão da coluna comments**
+```{r}
+mental_sem_coments_outliers <- subset(mental_sem_outliers, select = -comments)
+mental_sem_coments_outliers
+```
+**Exclusão da coluna state**
+```{r}
+mental_sem_coments_outliers_state <- subset(mental_sem_coments_outliers, select = -state)
+mental_sem_coments_outliers_state
+```
+```{r}
+plot_missing(mental_sem_coments_outliers_state) 
+```
+
+**Discretização**
+
+**Fiz a discretização no atributo Age. Defini três categorias sendo "jovem", "jovem adulto" e "adulto". Fiz tanto pelo método frequency quanto pelo método interval. Sendo que o último teve melhor balanceamento das categorias. Assim optei por interval.**
+
+```{r}
+mental_sem_coments_outliers_state %>% pull(Age) %>% discretize(method = "frequency", breaks = 3, labels = c("jovem","jovem adulto","adulto"))
+```
+
+```{r}
+ggplot(mental_sem_coments_outliers_state, aes(Age)) + geom_histogram() +
+  geom_vline(xintercept =
+      mental_sem_coments_outliers_state %>% pull(Age) %>% discretize(method = "frequency", breaks = 3, onlycuts = TRUE),
+    color = "blue") +
+  labs(title = "Discretization: frequency", subtitle = "Blue lines are boundaries")
+```
+
+```{r}
+mental_sem_coments_outliers_state %>% pull(Age) %>% discretize(method = "interval", breaks = 3, labels = c("jovem","jovem adulto","adulto"))
+```
+
+
+```{r}
+ggplot(mental_sem_coments_outliers_state, aes(Age)) + geom_histogram() +
+  geom_vline(xintercept =
+      mental_sem_coments_outliers_state %>% pull(Age) %>% discretize(method = "interval", breaks = 3, onlycuts = TRUE),
+    color = "blue") +
+  labs(title = "Discretization: interval", subtitle = "Blue lines are boundaries")
+```
+
+
+```{r}
+mental_sem_coments_outliers_state_discrete <- discretizeDF(mental_sem_coments_outliers_state, default = list(method = "interval", breaks = 3, 
+  labels = c("jovem","jovem adulto","adulto")))
+
+head(mental_sem_coments_outliers_state_discrete)
+summary(mental_sem_coments_outliers_state_discrete)
+```
+
+**Padronização**
+
+**Padronizei os dados de Gender**
+```{r}
+
+#Esssa listas foram elaboradas observando-se o summary
+
+Masculino <- c("Male ", "Male", "Cis Man", "Malr", "male", "M", "m", "Male-ish", "maile", "Mal", "Male (CIS)", "Cis Male", "Make", "Man", "msle", "Mail", "cis male")
+
+
+Feminino <- c("femail","Female (cis)","female","Female","F","Woman","f","Femake","woman","cis-female/femme", "Cis Female", "Trans-female", "Female (trans)", "Trans woman")
+
+
+Outro <-c ("ostensibly male, unsure what that really means","p","A little about you","queer","Neuter","something kinda male?","non-binary","Nah","All","Enby","fluid","Genderqueer","Androgyne","Agender","Guy (-ish) ^_^","male leaning androgynous", "queer/she/they")
+
+
+mental_sem_coments_outliers_state_discrete$Gender <- sapply(
+  as.vector(mental_sem_coments_outliers_state_discrete$Gender),
+  function(x) if(x %in% Masculino) "Masculino" else x ) 
+
+mental_sem_coments_outliers_state_discrete$Gender <- sapply(
+  as.vector(mental_sem_coments_outliers_state_discrete$Gender),
+  function(x) if(x %in% Feminino) "Feminino" else x ) 
+
+mental_sem_coments_outliers_state_discrete$Gender <- sapply(
+  as.vector(mental_sem_coments_outliers_state_discrete$Gender),
+  function(x) if(x %in% Outro) "Outro" else x ) 
+
+mental_sem_coments_outliers_state_discrete$Gender <- as.factor(mental_sem_coments_outliers_state_discrete$Gender)
+
+#Verificando
+summary(mental_sem_coments_outliers_state_discrete)
+
+``` 
+
+**Amostragem** 
+
+**Fiz a amostragem com 500 instâncias**
+
+```{r}
+set.seed(1000)
+s <- mental_sem_coments_outliers_state_discrete %>% sample_n(500)
+summary(s)
+```
+
+**Seleção de atributo.**
+
+**Verificando a base de dados, acredito que "care_options" e "wellness_program" são muito parecidas e dessa forma escolheria trabalhar apenas com care_options**
+
+**Fiz também a análise do atributo treatment com relação aos demais**
+
+**Através desse grafico podemos observar que dos mais jovens até a faixa de 30 anos há um maior número de pessoas que não estão em tratamento, ao passo que a partir de 30 anos ocorre uma inversão e as pessoas em tratamento estão em maior ou igual número.**
+
+**Obs: para utilizar esse gráfico a idade não pode estar discretizada, assim usei a versão anterior da base: mental_sem_coments_outliers_state**
+
+```{r}
+# Plot age histogram for both levels of 'treatment'
+ggplot(mental_sem_coments_outliers_state, aes(x=Age, color=treatment, fill=treatment)) +
+  geom_histogram(alpha=.5, position="identity", binwidth=2)
+```
+**Neste gráfico percebe-se que a maioria dos homens não está em tratamento enquanto a maioria das mulheres e demais grupos está. Podemos inferir ou que mulheres e demais grupos tem menos vergonha em procurar auxílio ou que homens estão sendo menos afetados pelo ambiente de trabalho.**
+
+```{r}
+count_data = mental_sem_coments_outliers_state_discrete %>% group_by(treatment, Gender) %>% count()
+ggplot(count_data, aes(x = treatment, y = n, color = Gender, fill = Gender)) + 
+    geom_bar(position = "fill",stat = "identity")
+```
+**Nesse gráfico é possível observar que há maior relação entre as pessoas que trabalham presencialmente com os tratamentos o que pode nos indicar fatores nos locais de trabalho que estejam levando as pessoas ao adoecimento.**
+
+```{r}
+ggplot(mental_sem_outliers, aes(x = remote_work, y = treatment)) + 
+  geom_count()
+```
+**Nesse gráfico é possível observar que, levando-se em consideração as tech companies há um maior número de pessoas que nao estão em tratamento do que as que estão. Esse gráfico por si é inconclusivo pois não podemos afirmar que as tech companies são ambientes melhores ou não**
+
+```{r}
+count_data = mental_sem_coments_outliers_state_discrete %>% group_by(treatment, tech_company) %>% count()
+ggplot(count_data, aes(x = treatment, y = n, color = tech_company, fill = tech_company)) + 
+    geom_bar(position = "fill",stat = "identity")
+```
+**Nesse gráfico observamos que para as pessoas que estão em tratamento há uma maior dificuldade em sair para licenças médicas**
+
+```{r}
+count_data = mental_sem_coments_outliers_state_discrete %>% group_by(treatment, leave) %>% count()
+ggplot(count_data, aes(x = treatment, y = n, color = leave, fill = leave)) + 
+    geom_bar(position = "fill",stat = "identity")
+```
+
+**Analizando-se a base de dados levanto algumas possibilidades de análises, sendo:**
+**mapear o quanto o trabalho presencial ou remoto está afetando a saúde mental dos funcionários, por gênero, nas empresas tech (os gráficos até então mapeam duas e nao três variáveis). Também poderia ser mapeada se a informação de programas de saúde tem chegado de fato aos funcionários das empresas tech e o impacto dessa informação nos tratamentos. E se os tratamentos são devidos ao histórico familiar ou as condições de trabalho e a qual o grau de interferência dessas variáveis para os tratamentos** 
