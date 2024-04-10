@@ -2,8 +2,6 @@
 
 Neste repositório estão os projetos referentes à Machine Learning, tanto em Python quanto em R. Aqui, faço um breve resumo de cada um deles. 
 
-Maiores informações então nos respectivos diretórios.
-
 ## Análise Exploratória - Mental_Health
 
 Neste trabalho são introduzidos alguns conceitos e comandos para a realização da análise exploratória de dados em R. Faço a visualização geral do DataFrame, onde o mesmo posui 27 atributos e 1259 instâncias, destes atributos 26 são do tipo ch (character) e 1 do tipo num. Verifico os valores de máximo, mínimo, média e mediana da coluna Age, onde percebe-se que o mesmo possui uma série de outliers que precisarão de tratamento. Faço também a plotagem de histogramas e boxplots, assim como a matriz de correlação. Por fim verifico missing.
