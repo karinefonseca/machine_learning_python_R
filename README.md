@@ -63,3 +63,10 @@ Neste projeto analiso o turnover (rotatividade) de profissionais de uma empresa.
 
 Neste trabalho analiso os dados de https://www.kaggle.com/datasets/osmi/mental-health-in-tech-survey que se trata de uma base de dados oriunda de uma pesquisa sobre a saúde mental e frequência de doenças mentais na área tech. Em um primeiro momento faço a análise exploratória, verificando o número de atributos e instâncias, analiso o atributo AGE onde percebe-se a presença de outliers que precisarão ser tratados. Verificação de missing, discretização do atributo AGE para três categorias "jovem", "jovem adulto" e "adulto" tanto pelo método frequency quanto pelo método interval. Padronização do atributo GENDER, amostragem e analise final.
 
+## Sentiment Analysis (Análise de Sentimentos)
+
+Nesse código, executo um exemplo de análise de sentimentos usando a biblioteca transfomers e o modelo BERT. Uso a frase de exemplo: "I just love watch tv shows!" e obtenho como resultado as probabilidades, sendo: 
+Probabilidades de Sentimento:
+Negativo: 0.2330920249223709
+Positivo: 0.7669079899787903 
+
